@@ -1,7 +1,6 @@
 import json
 import boto3
 import logging
-from decimal import Decimal
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -23,22 +22,15 @@ def lambda_handler(event, context):
     )
 
     try:
-        # Guardar la conexión
         connections_table.put_item(Item={
             "connectionId": connection_id,
-            "username": "Anónimo"
+            "username": "Anon"
         })
 
-        logger.info(f"Guardado connectionId: {connection_id}")
-
-        # Obtener todos los incidentes almacenados en DynamoDB
+        # Enviar incidentes actuales
         response = incidents_table.scan()
-        incidents = response.get("Items", [])
+        incidents = json.loads(json.dumps(response.get("Items", []), default=str))
 
-        # Convertir Decimals a float/str para JSON
-        incidents = json.loads(json.dumps(incidents, default=str))
-
-        # Mandar al usuario la lista inicial de incidentes
         api.post_to_connection(
             ConnectionId=connection_id,
             Data=json.dumps({
@@ -47,10 +39,8 @@ def lambda_handler(event, context):
             }).encode("utf-8")
         )
 
-        logger.info("📨 Lista inicial enviada")
-
         return {"statusCode": 200}
 
     except Exception as e:
-        logger.error(f"❌ ERROR en $connect: {str(e)}")
+        logger.error(f"ERROR en connect: {str(e)}")
         return {"statusCode": 500}

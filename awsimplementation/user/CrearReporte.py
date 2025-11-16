@@ -5,76 +5,74 @@ import uuid
 import os
 import traceback
 
-# URL de la API REST de Airflow
+dynamodb = boto3.resource("dynamodb")
+incidents_table = dynamodb.Table("Incidents")
+connections_table = dynamodb.Table("Connections")
+
 AIRFLOW_API_URL = "http://<airflow-instance-url>/api/v1/dags/your_dag_id/dagRuns"
+
+def send_ws_message(message):
+    """Envia mensaje a todos los WebSockets conectados"""
+    api = boto3.client(
+        "apigatewaymanagementapi",
+        endpoint_url=os.environ["WS_URL"]
+    )
+
+    # Obtener todas las conexiones activas
+    result = connections_table.scan()
+    connections = result.get("Items", [])
+
+    for conn in connections:
+        try:
+            api.post_to_connection(
+                ConnectionId=conn["connectionId"],
+                Data=json.dumps(message).encode("utf-8")
+            )
+        except Exception as e:
+            print(f"Conexión caída {conn['connectionId']}, eliminando...")
+            connections_table.delete_item(Key={"connectionId": conn["connectionId"]})
 
 def lambda_handler(event, context):
     try:
-        # Normalización del body
-        body = json.loads(event["body"]) if isinstance(event.get("body"), str) else event.get("body")
-        if body is None:
-            raise ValueError("No se recibió 'body' en el evento.")
+        body = json.loads(event.get("body", "{}"))
+        required = ["tipo_incidente", "nivel_urgencia", "ubicacion", "tipo_usuario", "descripcion"]
 
-        required_fields = ["tipo_incidente", "nivel_urgencia", "ubicacion", "tipo_usuario", "descripcion"]
-        missing = [f for f in required_fields if f not in body]
+        missing = [x for x in required if x not in body]
         if missing:
-            raise ValueError(f"Faltan campos obligatorios: {', '.join(missing)}")
+            return {"statusCode": 400, "body": f"Faltan campos: {missing}"}
 
+        uuidv4 = str(uuid.uuid4())
         tenant_id = body.get("tenant_id", "utec")
-        tipo_incidente = body["tipo_incidente"]
-        nivel_urgencia = body["nivel_urgencia"]
-        ubicacion = body["ubicacion"]
-        tipo_usuario = body["tipo_usuario"]
-        descripcion = body["descripcion"]
+
+        incidente = {
+            "uuid": uuidv4,
+            "tenant_id": tenant_id,
+            "tipo_incidente": body["tipo_incidente"],
+            "nivel_urgencia": body["nivel_urgencia"],
+            "ubicacion": body["ubicacion"],
+            "tipo_usuario": body["tipo_usuario"],
+            "descripcion": body["descripcion"],
+            "estado": "pendiente"
+        }
 
         # Guardar en DynamoDB
-        dynamodb = boto3.resource("dynamodb")
-        table = dynamodb.Table(os.environ["TABLE_NAME"])
-        uuidv4 = str(uuid.uuid4())
+        incidents_table.put_item(Item=incidente)
 
-        reporte = {
-            "tenant_id": tenant_id,
-            "uuid": uuidv4,
-            "tipo_incidente": tipo_incidente,
-            "nivel_urgencia": nivel_urgencia,
-            "ubicacion": ubicacion,
-            "tipo_usuario": tipo_usuario,
-            "descripcion": descripcion
-        }
+        # Llamar Airflow
+        airflow_payload = {"conf": {"uuid": uuidv4, "descripcion": body["descripcion"]}}
+        airflow_res = requests.post(AIRFLOW_API_URL, json=airflow_payload)
 
-        response = table.put_item(Item=reporte)
+        if airflow_res.status_code not in [200, 201]:
+            raise Exception(f"Airflow error: {airflow_res.text}")
 
-        # Llamar a Apache Airflow para clasificar el incidente
-        airflow_payload = {
-            "conf": {
-                "tenant_id": tenant_id,
-                "uuid": uuidv4,
-                "descripcion": descripcion
-            }
-        }
+        # Notificar por WebSocket a todos los administradores
+        send_ws_message({
+            "type": "newIncident",
+            "incident": incidente
+        })
 
-        airflow_response = requests.post(
-            AIRFLOW_API_URL,
-            data=json.dumps(airflow_payload),
-            headers={"Content-Type": "application/json"}
-        )
-
-        if airflow_response.status_code != 200:
-            raise ValueError(f"Error al invocar Airflow: {airflow_response.text}")
-
-        return {
-            "statusCode": 200,
-            "body": json.dumps({
-                "mensaje": "Reporte creado y clasificado",
-                "reporte": reporte,
-                "put_response": response
-            })
-        }
-
-    except ValueError as ve:
-        error_log = {"mensaje": str(ve), "input_event": event, "traceback": traceback.format_exc()}
-        return {"statusCode": 400, "body": json.dumps({"mensaje": "Error de validación", "error": str(ve)})}
+        return {"statusCode": 200, "body": json.dumps({"mensaje": "Reporte creado", "uuid": uuidv4})}
 
     except Exception as e:
-        error_log = {"mensaje": str(e), "input_event": event, "traceback": traceback.format_exc()}
-        return {"statusCode": 500, "body": json.dumps({"mensaje": "Error inesperado", "error": str(e)})}
+        traceback.print_exc()
+        return {"statusCode": 500, "body": str(e)}

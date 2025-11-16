@@ -21,45 +21,35 @@ def lambda_handler(event, context):
     )
 
     try:
-        # Obtener username antes de eliminar
         item = connections_table.get_item(Key={"connectionId": connection_id}).get("Item")
-        username = item["username"] if item else "Anónimo"
+        username = item["username"] if item else "Anon"
 
-        # Eliminar conexión
         connections_table.delete_item(Key={"connectionId": connection_id})
 
-        # Obtener todas las conexiones restantes
+        # Obtener conexiones restantes
         result = connections_table.scan()
         connections = result.get("Items", [])
 
-        # Notificación
+        # Mensaje para enviar
         notification = {
             "type": "notification",
             "message": f"{username} se ha desconectado"
         }
-
         user_list = {
             "type": "userList",
             "users": [c["username"] for c in connections]
         }
 
-        # Enviar a todos
         for conn in connections:
-            cid = conn["connectionId"]
             try:
-                api.post_to_connection(
-                    ConnectionId=cid,
-                    Data=json.dumps(notification).encode("utf-8")
-                )
-                api.post_to_connection(
-                    ConnectionId=cid,
-                    Data=json.dumps(user_list).encode("utf-8")
-                )
-            except Exception as e:
-                logger.error(f"Error notificando a {cid}: {str(e)}")
+                cid = conn["connectionId"]
+                api.post_to_connection(ConnectionId=cid, Data=json.dumps(notification).encode())
+                api.post_to_connection(ConnectionId=cid, Data=json.dumps(user_list).encode())
+            except:
+                connections_table.delete_item(Key={"connectionId": cid})
 
         return {"statusCode": 200}
 
     except Exception as e:
-        logger.error(f"❌ ERROR en $disconnect: {str(e)}")
+        logger.error(f"ERROR disconnect: {str(e)}")
         return {"statusCode": 500}
