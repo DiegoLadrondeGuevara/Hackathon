@@ -16,6 +16,7 @@ interface BackendPayload {
   ubicacion: string;
   tipo_usuario: string;
   descripcion: string;
+  nivel_urgencia: string;
 }
 
 // ================================
@@ -25,7 +26,7 @@ const API_URL =
   "https://4iyael92qd.execute-api.us-east-1.amazonaws.com/dev/reporte/crear";
 
 const WS_URL =
-  "wss://xxxxxxxxx.execute-api.us-east-1.amazonaws.com/dev"; // ← pon tu URL WS
+  "wss://fqlc20lepk.execute-api.us-east-1.amazonaws.com/production/";
 
 function App() {
   // ================================
@@ -39,6 +40,7 @@ function App() {
     ubicacion: "",
     descripcion: "",
     rol: "",
+    urgencia: "",
   });
 
   const ws = useRef<WebSocket | null>(null);
@@ -116,9 +118,9 @@ function App() {
   // CREAR INCIDENTE
   // ================================
   const handleAddIncident = async () => {
-    const { tipo, ubicacion, descripcion, rol } = formData;
+    const { tipo, ubicacion, descripcion, rol, urgencia } = formData;
 
-    if (!tipo || !ubicacion || !descripcion || !rol) {
+    if (!tipo || !ubicacion || !descripcion || !rol || !urgencia) {
       alert("Completa todos los campos");
       return;
     }
@@ -129,6 +131,7 @@ function App() {
       ubicacion,
       tipo_usuario: rol,
       descripcion,
+      nivel_urgencia: urgencia,
     };
 
     // Optimistic UI
@@ -154,6 +157,7 @@ function App() {
       ubicacion: "",
       descripcion: "",
       rol: "",
+      urgencia: "",
     });
 
     setShowForm(false);
@@ -229,6 +233,20 @@ function App() {
               <option value="estudiante">Estudiante</option>
               <option value="administrativo">Personal administrativo</option>
               <option value="autoridad">Autoridad</option>
+            </select>
+
+            <select
+              value={formData.urgencia}
+              onChange={(e) =>
+                setFormData({ ...formData, urgencia: e.target.value })
+              }
+              className="border border-gray-400 rounded-lg px-4 py-2 text-black"
+            >
+              <option value="">Nivel de urgencia</option>
+              <option value="baja">Baja</option>
+              <option value="media">Media</option>
+              <option value="alta">Alta</option>
+              <option value="critica">Crítica</option>
             </select>
           </div>
 

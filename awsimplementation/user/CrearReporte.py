@@ -6,16 +6,21 @@ import os
 import traceback
 
 dynamodb = boto3.resource("dynamodb")
-incidents_table = dynamodb.Table("Incidents")
-connections_table = dynamodb.Table("Connections")
+incidents_table = dynamodb.Table(os.environ.get("INCIDENTS_TABLE", "Incidents"))
+connections_table = dynamodb.Table(os.environ.get("CONNECTIONS_TABLE", "Connections"))
 
 AIRFLOW_API_URL = "http://<airflow-instance-url>/api/v1/dags/your_dag_id/dagRuns"
 
 def send_ws_message(message):
     """Envia mensaje a todos los WebSockets conectados"""
+    ws_endpoint = os.environ.get("WS_ENDPOINT")
+    if not ws_endpoint:
+        print("WARNING: WS_ENDPOINT no configurado, no se enviará mensaje WebSocket")
+        return
+    
     api = boto3.client(
         "apigatewaymanagementapi",
-        endpoint_url=os.environ["WS_URL"]
+        endpoint_url=ws_endpoint
     )
 
     # Obtener todas las conexiones activas

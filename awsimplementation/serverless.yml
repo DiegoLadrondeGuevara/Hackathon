@@ -20,6 +20,10 @@ functions:
           method: post
           cors: true
           integration: lambda
+    environment:
+      CONNECTIONS_TABLE: Connections
+      INCIDENTS_TABLE: Incidents
+      WS_ENDPOINT: !Sub "https://${WebsocketsApi}.execute-api.${AWS::Region}.amazonaws.com/${sls:stage}"
 
   listar:
     handler: admin/ListarReportes.lambda_handler
@@ -68,6 +72,13 @@ functions:
 
 resources:
   Resources:
+    WebsocketsApi:
+      Type: AWS::ApiGatewayV2::Api
+      Properties:
+        Name: ${self:service}-websocket-${sls:stage}
+        ProtocolType: WEBSOCKET
+        RouteSelectionExpression: "$request.body.action"
+    
     ReportesDynamoDBTable:
       Type: AWS::DynamoDB::Table
       Properties:
