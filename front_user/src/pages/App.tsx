@@ -5,14 +5,12 @@ interface Incident {
   tipo: string
   ubicacion: string
   descripcion: string
-  urgencia: string
   rol: string
 }
 
 interface BackendPayload {
   tenant_id: string
   tipo_incidente: string
-  nivel_urgencia: string
   ubicacion: string
   tipo_usuario: string
   descripcion: string
@@ -31,7 +29,6 @@ function App() {
     tipo: "",
     ubicacion: "",
     descripcion: "",
-    urgencia: "",
     rol: ""
   })
 
@@ -64,9 +61,9 @@ function App() {
   // ADD INCIDENT
   // ==============================
   const handleAddIncident = async () => {
-    const { tipo, ubicacion, descripcion, urgencia, rol } = formData
+    const { tipo, ubicacion, descripcion, rol } = formData
 
-    if (!tipo || !ubicacion || !descripcion || !urgencia || !rol) {
+    if (!tipo || !ubicacion || !descripcion || !rol) {
       alert("Completa todos los campos")
       return
     }
@@ -75,13 +72,12 @@ function App() {
     const payload: BackendPayload = {
       tenant_id: "utec",
       tipo_incidente: tipo,
-      nivel_urgencia: urgencia,
       ubicacion: ubicacion,
       tipo_usuario: rol,
       descripcion: descripcion
     }
 
-    // Guardar en UI local
+    // Guardar en UI local (no guardamos "urgencia" ya que será asignado por el backend)
     const newIncident: Incident = { ...formData, id: Date.now() }
     setIncidents((prev) => [...prev, newIncident])
 
@@ -89,6 +85,7 @@ function App() {
     try {
       await crearIncidente(payload)
     } catch (err) {
+      console.error("Failed to enviar reporte:", err)
       alert("No se pudo enviar el reporte al servidor.")
     }
 
@@ -98,7 +95,6 @@ function App() {
       tipo: "",
       ubicacion: "",
       descripcion: "",
-      urgencia: "",
       rol: ""
     })
 
@@ -148,18 +144,6 @@ function App() {
               <option value="Acoso">Acoso</option>
               <option value="Daño a propiedad">Daño a propiedad</option>
               <option value="Otro">Otro</option>
-            </select>
-
-            {/* Nivel urgencia */}
-            <select
-              value={formData.urgencia}
-              onChange={(e) => setFormData({ ...formData, urgencia: e.target.value })}
-              className="border border-gray-400 rounded-lg px-4 py-2 text-black"
-            >
-              <option value="">Nivel de urgencia</option>
-              <option value="Alta">Alta</option>
-              <option value="Media">Media</option>
-              <option value="Baja">Baja</option>
             </select>
 
             {/* Ubicación */}
@@ -231,9 +215,6 @@ function App() {
                     <h3 className="font-bold text-black text-lg">{inc.tipo}</h3>
                     <p className="text-gray-700">📍 {inc.ubicacion}</p>
                     <p className="text-gray-600 mt-1">{inc.descripcion}</p>
-                    <p className="mt-2 text-sm text-blue-700 font-semibold">
-                      Urgencia: {inc.urgencia}
-                    </p>
                     <p className="mt-1 text-sm text-green-700 font-semibold">
                       Rol: {inc.rol}
                     </p>

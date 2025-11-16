@@ -1,7 +1,6 @@
 import boto3
 import uuid
 import os
-import json
 import traceback
 
 # ------------------------------
