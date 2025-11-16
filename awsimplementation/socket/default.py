@@ -1,6 +1,7 @@
 import json
 import boto3
 import logging
+import os
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -9,89 +10,61 @@ dynamodb = boto3.resource("dynamodb")
 connections_table = dynamodb.Table("Connections")
 incidents_table = dynamodb.Table("Incidents")
 
+# 🔥 endpoint real del WebSocket (no domain/stage del evento)
+WS_ENDPOINT = os.environ["WS_ENDPOINT"]
+api = boto3.client("apigatewaymanagementapi", endpoint_url=WS_ENDPOINT)
+
 def lambda_handler(event, context):
     logger.info("=== WebSocket $default ===")
-    logger.info(f"Event: {json.dumps(event)}")
-
-    connection_id = event["requestContext"]["connectionId"]
-    domain = event["requestContext"]["domainName"]
-    stage = event["requestContext"]["stage"]
-
-    api = boto3.client(
-        "apigatewaymanagementapi",
-        endpoint_url=f"https://{domain}/{stage}"
-    )
+    logger.info(json.dumps(event))
 
     try:
-        # Parsear el body del mensaje
+        connection_id = event["requestContext"]["connectionId"]
         body = json.loads(event.get("body", "{}"))
-        action = body.get("action", "unknown")
-        
+        action = body.get("action")
+
         logger.info(f"Action recibida: {action}")
 
-        # Manejar diferentes acciones
+        # ----- getIncidents -----
         if action == "getIncidents":
-            # Enviar lista de incidentes al cliente
-            response = incidents_table.scan()
-            incidents = response.get("Items", [])
-            
+            incidents = incidents_table.scan().get("Items", [])
             api.post_to_connection(
                 ConnectionId=connection_id,
                 Data=json.dumps({
                     "type": "incidentsList",
                     "incidents": incidents
-                }).encode("utf-8")
+                }).encode()
             )
-        
-        elif action == "nuevoReporte":
-            # Broadcast a todas las conexiones
+            return {"statusCode": 200}
+
+        # ----- nuevoReporte -----
+        if action == "nuevoReporte":
             data = body.get("data", {})
-            
-            # Obtener todas las conexiones
-            result = connections_table.scan()
-            connections = result.get("Items", [])
-            
+
+            connections = connections_table.scan().get("Items", [])
             message = {
                 "type": "nuevoReporte",
                 "data": data
             }
-            
-            # Enviar a todas las conexiones
+
             for conn in connections:
                 try:
-                    cid = conn["connectionId"]
                     api.post_to_connection(
-                        ConnectionId=cid,
-                        Data=json.dumps(message).encode("utf-8")
+                        ConnectionId=conn["connectionId"],
+                        Data=json.dumps(message).encode()
                     )
-                except Exception as e:
-                    logger.error(f"Error enviando a {cid}: {str(e)}")
-                    # Si falla, eliminar conexión obsoleta
-                    connections_table.delete_item(Key={"connectionId": cid})
-        
-        else:
-            # Acción desconocida
-            api.post_to_connection(
-                ConnectionId=connection_id,
-                Data=json.dumps({
-                    "type": "error",
-                    "message": f"Acción desconocida: {action}"
-                }).encode("utf-8")
-            )
+                except Exception:
+                    connections_table.delete_item(Key={"connectionId": conn["connectionId"]})
 
+            return {"statusCode": 200}
+
+        # Acción desconocida
+        api.post_to_connection(
+            ConnectionId=connection_id,
+            Data=json.dumps({"type": "error", "message": "Acción desconocida"}).encode()
+        )
         return {"statusCode": 200}
 
     except Exception as e:
-        logger.error(f"ERROR en default: {str(e)}")
-        try:
-            api.post_to_connection(
-                ConnectionId=connection_id,
-                Data=json.dumps({
-                    "type": "error",
-                    "message": str(e)
-                }).encode("utf-8")
-            )
-        except:
-            pass
-        
+        logger.error(str(e))
         return {"statusCode": 500}

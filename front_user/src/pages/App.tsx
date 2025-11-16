@@ -19,7 +19,7 @@ interface BackendPayload {
 function App() {
 
   const API_URL =
-    "https://2h54p52i9j.execute-api.us-east-1.amazonaws.com/dev/reporte/crear"
+    " https://h2gfygpq0m.execute-api.us-east-1.amazonaws.com/dev/reporte/crear"
   
   const WS_URL = "wss://20rv7633q8.execute-api.us-east-1.amazonaws.com/dev"
 

@@ -11,19 +11,18 @@ connections_table = dynamodb.Table("Connections")
 
 def lambda_handler(event, context):
     logger.info("=== WebSocket $connect ===")
-    logger.info(f"Event: {json.dumps(event)}")
+    logger.info(json.dumps(event))
 
     try:
         connection_id = event["requestContext"]["connectionId"]
-        
-        # Solo guardar la conexión en DynamoDB
-        # NO intentar enviar mensajes durante $connect
+
+        # Guardar conexión
         connections_table.put_item(Item={
             "connectionId": connection_id,
             "username": "Anon",
             "timestamp": int(time.time())
         })
-        
+
         logger.info(f"Conexión guardada: {connection_id}")
 
         return {

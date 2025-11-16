@@ -10,15 +10,12 @@ connections_table = dynamodb.Table("Connections")
 
 def lambda_handler(event, context):
     logger.info("=== WebSocket $disconnect ===")
-    logger.info(f"Event: {json.dumps(event)}")
+    logger.info(json.dumps(event))
 
     try:
         connection_id = event["requestContext"]["connectionId"]
-        
-        # Eliminar la conexión de DynamoDB
+
         connections_table.delete_item(Key={"connectionId": connection_id})
-        
-        logger.info(f"Conexión eliminada: {connection_id}")
 
         return {
             "statusCode": 200,
@@ -26,8 +23,8 @@ def lambda_handler(event, context):
         }
 
     except Exception as e:
-        logger.error(f"ERROR disconnect: {str(e)}")
+        logger.error(str(e))
         return {
-            "statusCode": 200,  # Retornar 200 incluso con error para no bloquear la desconexión
+            "statusCode": 200,
             "body": json.dumps({"error": str(e)})
         }
