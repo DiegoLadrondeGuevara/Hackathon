@@ -1,171 +1,106 @@
-import { useEffect, useState, useRef } from "react";
+import { useState } from "react"
 
 interface Incident {
-  uuid?: string;
-  tipo_incidente?: string;
-  ubicacion?: string;
-  descripcion?: string;
-  tipo_usuario?: string;
-  nivel_urgencia?: string;
-  estado?: string;
+  id: number
+  tipo: string
+  ubicacion: string
+  descripcion: string
+  rol: string
 }
 
 interface BackendPayload {
-  tenant_id: string;
-  tipo_incidente: string;
-  ubicacion: string;
-  tipo_usuario: string;
-  descripcion: string;
-  nivel_urgencia: string;
+  tenant_id: string
+  tipo_incidente: string
+  ubicacion: string
+  tipo_usuario: string
+  descripcion: string
 }
 
-// ================================
-// CONFIG
-// ================================
-const API_URL =
-  "https://4iyael92qd.execute-api.us-east-1.amazonaws.com/dev/reporte/crear";
-
-const WS_URL =
-  "wss://fqlc20lepk.execute-api.us-east-1.amazonaws.com/production/";
-
 function App() {
-  // ================================
-  // ESTADOS
-  // ================================
-  const [incidents, setIncidents] = useState<Incident[]>([]);
-  const [showForm, setShowForm] = useState<boolean>(false);
 
-  const [formData, setFormData] = useState({
+  const API_URL =
+    "https://4iyael92qd.execute-api.us-east-1.amazonaws.com/dev/reporte/crear"
+
+  const [incidents, setIncidents] = useState<Incident[]>([])
+  const [showForm, setShowForm] = useState<boolean>(false)
+
+  const [formData, setFormData] = useState<Incident>({
+    id: 0,
     tipo: "",
     ubicacion: "",
     descripcion: "",
-    rol: "",
-    urgencia: "",
-  });
+    rol: ""
+  })
 
-  const ws = useRef<WebSocket | null>(null);
-
-  // ================================
-  // INICIO DEL WEBSOCKET
-  // ================================
-  useEffect(() => {
-    console.log("Conectando WebSocket...");
-
-    ws.current = new WebSocket(WS_URL);
-
-    ws.current.onopen = () => {
-      console.log("✅ WebSocket conectado");
-
-      // Registrar username
-      ws.current?.send(
-        JSON.stringify({
-          action: "register",
-          username: "admin", // ← puedes cambiar a "usuario"
-        })
-      );
-    };
-
-    ws.current.onmessage = (event) => {
-      const msg = JSON.parse(event.data);
-      console.log("📩 WS message:", msg);
-
-      if (msg.type === "incidentsList") {
-        // Lista inicial de incidentes desde DynamoDB
-        setIncidents(msg.incidents);
-      }
-
-      if (msg.type === "newIncident") {
-        // Nuevo incidente creado por un usuario
-        setIncidents((prev) => [...prev, msg.incident]);
-      }
-    };
-
-    ws.current.onclose = () => {
-      console.log("❌ WebSocket cerrado");
-    };
-
-    return () => {
-      ws.current?.close();
-    };
-  }, []);
-
-  // ================================
+  // ==============================
   // API CALL
-  // ================================
+  // ==============================
   async function crearIncidente(data: BackendPayload) {
     try {
       const resp = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
+        body: JSON.stringify(data)
+      })
 
       if (!resp.ok) {
-        const text = await resp.text();
-        console.error("API error:", resp.status, text);
-        throw new Error(`API request failed: ${resp.status}`);
+        const text = await resp.text()
+        console.error("API error:", resp.status, text)
+        throw new Error(`API request failed: ${resp.status}`)
       }
 
-      const json = await resp.json();
-      return json;
+      const json = await resp.json()
+      return json
     } catch (err) {
-      console.error("Failed to crearIncidente:", err);
-      throw err;
+      console.error("Failed to crearIncidente:", err)
+      throw err
     }
   }
 
-  // ================================
-  // CREAR INCIDENTE
-  // ================================
+  // ==============================
+  // ADD INCIDENT
+  // ==============================
   const handleAddIncident = async () => {
-    const { tipo, ubicacion, descripcion, rol, urgencia } = formData;
+    const { tipo, ubicacion, descripcion, rol } = formData
 
-    if (!tipo || !ubicacion || !descripcion || !rol || !urgencia) {
-      alert("Completa todos los campos");
-      return;
+    if (!tipo || !ubicacion || !descripcion || !rol) {
+      alert("Completa todos los campos")
+      return
     }
 
+    // Construir el JSON exacto que tu Lambda espera
     const payload: BackendPayload = {
       tenant_id: "utec",
       tipo_incidente: tipo,
-      ubicacion,
+      ubicacion: ubicacion,
       tipo_usuario: rol,
-      descripcion,
-      nivel_urgencia: urgencia,
-    };
-
-    // Optimistic UI
-    setIncidents((prev) => [
-      ...prev,
-      {
-        tipo_incidente: tipo,
-        ubicacion,
-        descripcion,
-        tipo_usuario: rol,
-        estado: "pendiente",
-      },
-    ]);
-
-    try {
-      await crearIncidente(payload);
-    } catch {
-      alert("Error enviando el reporte.");
+      descripcion: descripcion
     }
 
+    // Guardar en UI local (no guardamos "urgencia" ya que será asignado por el backend)
+    const newIncident: Incident = { ...formData, id: Date.now() }
+    setIncidents((prev) => [...prev, newIncident])
+
+    // Intentar enviar al backend
+    try {
+      await crearIncidente(payload)
+    } catch (err) {
+      console.error("Failed to enviar reporte:", err)
+      alert("No se pudo enviar el reporte al servidor.")
+    }
+
+    // Limpiar formulario
     setFormData({
+      id: 0,
       tipo: "",
       ubicacion: "",
       descripcion: "",
-      rol: "",
-      urgencia: "",
-    });
+      rol: ""
+    })
 
-    setShowForm(false);
-  };
+    setShowForm(false)
+  }
 
-  // ================================
-  // RENDER
-  // ================================
   return (
     <div className="min-h-screen bg-white p-8">
       {/* Header */}
@@ -174,7 +109,7 @@ function App() {
           Reportes de Incidentes
         </h1>
         <p className="text-gray-600">
-          Gestiona y registra incidentes dentro del campus (modo tiempo real).
+          Gestiona y registra incidentes dentro del campus.
         </p>
       </div>
 
@@ -197,12 +132,11 @@ function App() {
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            {/* Tipo */}
             <select
               value={formData.tipo}
-              onChange={(e) =>
-                setFormData({ ...formData, tipo: e.target.value })
-              }
-              className="border border-gray-400 rounded-lg px-4 py-2 text-black"
+              onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
+              className="border border-gray-400 rounded-lg px-4 py-2 text-black focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
             >
               <option value="">Tipo de incidente</option>
               <option value="Robo">Robo</option>
@@ -212,21 +146,19 @@ function App() {
               <option value="Otro">Otro</option>
             </select>
 
+            {/* Ubicación */}
             <input
               type="text"
               placeholder="Ubicación"
               value={formData.ubicacion}
-              onChange={(e) =>
-                setFormData({ ...formData, ubicacion: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, ubicacion: e.target.value })}
               className="border border-gray-400 rounded-lg px-4 py-2 text-black"
             />
 
+            {/* Rol */}
             <select
               value={formData.rol}
-              onChange={(e) =>
-                setFormData({ ...formData, rol: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, rol: e.target.value })}
               className="border border-gray-400 rounded-lg px-4 py-2 text-black"
             >
               <option value="">Selecciona tu rol</option>
@@ -234,28 +166,13 @@ function App() {
               <option value="administrativo">Personal administrativo</option>
               <option value="autoridad">Autoridad</option>
             </select>
-
-            <select
-              value={formData.urgencia}
-              onChange={(e) =>
-                setFormData({ ...formData, urgencia: e.target.value })
-              }
-              className="border border-gray-400 rounded-lg px-4 py-2 text-black"
-            >
-              <option value="">Nivel de urgencia</option>
-              <option value="baja">Baja</option>
-              <option value="media">Media</option>
-              <option value="alta">Alta</option>
-              <option value="critica">Crítica</option>
-            </select>
           </div>
 
+          {/* Descripción */}
           <textarea
-            placeholder="Descripción detallada..."
+            placeholder="Descripción detallada del incidente..."
             value={formData.descripcion}
-            onChange={(e) =>
-              setFormData({ ...formData, descripcion: e.target.value })
-            }
+            onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
             className="border border-gray-400 rounded-lg px-4 py-2 w-full text-black mb-4"
             rows={3}
           />
@@ -270,7 +187,7 @@ function App() {
 
             <button
               onClick={() => setShowForm(false)}
-              className="bg-gray-400 hover:bg-gray-500 text-white font-semibold py-2 px-6 rounded-lg"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg"
             >
               Cancelar
             </button>
@@ -288,23 +205,27 @@ function App() {
           </div>
         ) : (
           <div className="space-y-4">
-            {incidents.map((inc, idx) => (
+            {incidents.map((inc) => (
               <div
-                key={idx}
+                key={inc.id}
                 className="bg-white border border-gray-300 rounded-lg p-4 hover:shadow-md"
               >
-                <div className="flex justify-between">
+                <div className="flex justify-between items-start">
                   <div>
-                    <h3 className="font-bold text-black text-lg">
-                      {inc.tipo_incidente}
-                    </h3>
+                    <h3 className="font-bold text-black text-lg">{inc.tipo}</h3>
                     <p className="text-gray-700">📍 {inc.ubicacion}</p>
                     <p className="text-gray-600 mt-1">{inc.descripcion}</p>
-
-                    <p className="mt-1 text-sm text-blue-700 font-semibold">
-                      Estado: {inc.estado || "pendiente"}
+                    <p className="mt-1 text-sm text-green-700 font-semibold">
+                      Rol: {inc.rol}
                     </p>
                   </div>
+
+                  <button
+                    onClick={() => setIncidents(prev => prev.filter(r => r.id !== inc.id))}
+                    className="text-red-600 hover:text-red-800 font-semibold"
+                  >
+                    Eliminar
+                  </button>
                 </div>
               </div>
             ))}
@@ -312,7 +233,7 @@ function App() {
         )}
       </div>
     </div>
-  );
+  )
 }
 
-export default App;
+export default App
