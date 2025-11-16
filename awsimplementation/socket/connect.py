@@ -26,13 +26,11 @@ def lambda_handler(event, context):
         logger.info(f"Conexión guardada: {connection_id}")
 
         return {
-            "statusCode": 200,
-            "body": "Connected"
+            "statusCode": 200
         }
 
     except Exception as e:
         logger.error(f"ERROR en connect: {str(e)}")
         return {
-            "statusCode": 500,
-            "body": json.dumps({"error": str(e)})
+            "statusCode": 500
         }

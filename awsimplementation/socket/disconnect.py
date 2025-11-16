@@ -18,13 +18,11 @@ def lambda_handler(event, context):
         connections_table.delete_item(Key={"connectionId": connection_id})
 
         return {
-            "statusCode": 200,
-            "body": "Disconnected"
+            "statusCode": 200
         }
 
     except Exception as e:
         logger.error(str(e))
         return {
-            "statusCode": 200,
-            "body": json.dumps({"error": str(e)})
+            "statusCode": 200
         }
