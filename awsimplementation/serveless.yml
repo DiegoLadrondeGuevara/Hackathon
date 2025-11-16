@@ -1,5 +1,5 @@
 org: diegoladrondeg
-service: api-pelicula
+service: awsimplementation-reportes
 
 provider:
   name: aws
