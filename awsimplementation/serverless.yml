@@ -51,20 +51,29 @@ functions:
           cors: true
           integration: lambda
 
-  # WebSocket Lambda Functions (sin eventos - los configurarás manualmente en API Gateway)
+  # WebSocket Lambda Functions
   connect:
     handler: connect.lambda_handler
+    events:
+      - websocket:
+          route: $connect
     environment:
       CONNECTIONS_TABLE: Connections
       INCIDENTS_TABLE: Incidents
 
   disconnect:
     handler: disconnect.lambda_handler
+    events:
+      - websocket:
+          route: $disconnect
     environment:
       CONNECTIONS_TABLE: Connections
 
   default:
     handler: default.lambda_handler
+    events:
+      - websocket:
+          route: $default
     environment:
       CONNECTIONS_TABLE: Connections
       INCIDENTS_TABLE: Incidents
