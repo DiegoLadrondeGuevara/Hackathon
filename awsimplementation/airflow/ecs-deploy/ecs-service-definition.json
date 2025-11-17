@@ -1,13 +1,13 @@
 {
   "family": "airflow-task",
-  "executionRoleArn": "arn:aws:iam::804190897568:role/ecsTaskExecutionRole", 
+  "executionRoleArn": "arn:aws:iam::804190897568:role/ecsTaskExecutionRole",
   "networkMode": "awsvpc",
   "containerDefinitions": [
     {
       "name": "airflow",
-      "image": "804190897568.dkr.ecr.us-east-1.amazonaws.com/hackathon:latest",  
+      "image": "804190897568.dkr.ecr.us-east-1.amazonaws.com/hackathon",
       "memory": 512,
-      "cpu": 256, 
+      "cpu": 256,
       "essential": true,
       "environment": [
         {
@@ -16,11 +16,11 @@
         },
         {
           "name": "SUBNET_ID_1",
-          "value": "subnet-abc123"  
+          "value": "subnet-028fa57a7c5637b7f" 
         },
         {
           "name": "SUBNET_ID_2",
-          "value": "subnet-def456"
+          "value": "subnet-0c0c3f5a84827c4ae" 
         },
         {
           "name": "SOURCE_BUCKET_ARN",
