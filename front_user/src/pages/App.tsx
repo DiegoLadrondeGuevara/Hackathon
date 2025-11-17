@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react"
+import Login from "./Login"
 
 interface Incident {
   id: number
@@ -16,11 +17,18 @@ interface BackendPayload {
   descripcion: string
 }
 
+interface Usuario {
+  email: string
+  nombre: string
+}
+
 function App() {
 
-  const API_URL = "https://bjn3x9fv10.execute-api.us-east-1.amazonaws.com/dev/reporte/crear"  
+  const API_BASE_URL = "https://bjn3x9fv10.execute-api.us-east-1.amazonaws.com/dev"
+  const API_URL = `${API_BASE_URL}/reporte/crear`  
   const WS_URL = "wss://9uubdx8ktg.execute-api.us-east-1.amazonaws.com/dev"
 
+  const [usuario, setUsuario] = useState<Usuario | null>(null)
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [isConnected, setIsConnected] = useState<boolean>(false)
   const wsRef = useRef<WebSocket | null>(null)
@@ -33,6 +41,25 @@ function App() {
     descripcion: "",
     rol: ""
   })
+
+  // Verificar si hay sesión activa
+  useEffect(() => {
+    const usuarioGuardado = localStorage.getItem("usuario")
+    if (usuarioGuardado) {
+      setUsuario(JSON.parse(usuarioGuardado))
+    }
+  }, [])
+
+  const handleLogout = () => {
+    localStorage.removeItem("usuario")
+    localStorage.removeItem("token")
+    setUsuario(null)
+  }
+
+  // Si no hay usuario, mostrar login
+  if (!usuario) {
+    return <Login onLoginSuccess={setUsuario} apiUrl={API_BASE_URL} />
+  }
 
   // ==============================
   // WEBSOCKET CONNECTION
@@ -190,21 +217,30 @@ function App() {
     <div className="min-h-screen bg-white p-8">
       {/* Header */}
       <div className="max-w-4xl mx-auto mb-12">
-        <div className="flex justify-between items-center">
-          <div>
+        <div className="flex justify-between items-start">
+          <div className="flex-1">
             <h1 className="text-4xl font-bold text-black mb-2">
               Reportes de Incidentes
             </h1>
             <p className="text-gray-600">
-              Gestiona y registra incidentes dentro del campus.
+              Hola, <b>{usuario?.nombre}</b> • Gestiona y registra incidentes dentro del campus.
             </p>
           </div>
-          {/* Indicador de conexión WebSocket */}
-          <div className="flex items-center gap-2">
-            <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-            <span className="text-sm text-gray-600">
-              {isConnected ? 'Conectado' : 'Desconectado'}
-            </span>
+          
+          {/* User Info y Logout */}
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-2">
+              <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              <span className="text-sm text-gray-600">
+                {isConnected ? 'Conectado' : 'Desconectado'}
+              </span>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="text-sm text-red-600 hover:text-red-800 font-semibold"
+            >
+              Cerrar Sesión
+            </button>
           </div>
         </div>
       </div>

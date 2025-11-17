@@ -1,4 +1,4 @@
-org: alonsobenitess2
+org: gianaedo
 service: awsimplementation-reportes
 
 provider:
@@ -7,7 +7,7 @@ provider:
   memorySize: 1024
   timeout: 30
   iam:
-    role: arn:aws:iam::458879724766:role/LabRole
+    role: arn:aws:iam::866725828595:role/LabRole
   environment:
     TABLE_NAME: ${sls:stage}-t_reportes
 
@@ -77,6 +77,43 @@ functions:
       CONNECTIONS_TABLE: Connections
       TABLE_NAME: ${self:provider.environment.TABLE_NAME}
 
+  # ========== AUTH LAMBDAS ==========
+  registroUsuario:
+    handler: RegistroUsuario.lambda_handler
+    events:
+      - http:
+          path: /auth/registro/usuario
+          method: post
+          cors: true
+          integration: lambda
+
+  loginUsuario:
+    handler: LoginUsuario.lambda_handler
+    events:
+      - http:
+          path: /auth/login/usuario
+          method: post
+          cors: true
+          integration: lambda
+
+  registroAdmin:
+    handler: RegistroAdmin.lambda_handler
+    events:
+      - http:
+          path: /auth/registro/admin
+          method: post
+          cors: true
+          integration: lambda
+
+  loginAdmin:
+    handler: LoginAdmin.lambda_handler
+    events:
+      - http:
+          path: /auth/login/admin
+          method: post
+          cors: true
+          integration: lambda
+
 resources:
   Resources:
 
@@ -108,5 +145,29 @@ resources:
             AttributeType: S
         KeySchema:
           - AttributeName: connectionId
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+
+    UsuariosTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: usuarios
+        AttributeDefinitions:
+          - AttributeName: email
+            AttributeType: S
+        KeySchema:
+          - AttributeName: email
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+
+    AdminsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: admins
+        AttributeDefinitions:
+          - AttributeName: email
+            AttributeType: S
+        KeySchema:
+          - AttributeName: email
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST

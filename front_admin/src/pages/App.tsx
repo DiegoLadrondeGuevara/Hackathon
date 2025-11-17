@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react"
+import Login from "./Login"
 
 interface Reporte {
   tenant_id: string
@@ -9,6 +10,11 @@ interface Reporte {
   tipo_usuario: string
   descripcion: string
   estado?: string
+}
+
+interface Admin {
+  email: string
+  nombre: string
 }
 
 const API_BASE_URL =
@@ -22,6 +28,7 @@ const WS_URL =
 function App() {
   const TENANT_ID = "utec"
 
+  const [admin, setAdmin] = useState<Admin | null>(null)
   const [reportes, setReportes] = useState<Reporte[]>([])
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string>("")
@@ -30,6 +37,25 @@ function App() {
 
   const ws = useRef<WebSocket | null>(null)
   const reconnectTimeout = useRef<any>(null)
+
+  // Verificar si hay sesión activa
+  useEffect(() => {
+    const adminGuardado = localStorage.getItem("admin")
+    if (adminGuardado) {
+      setAdmin(JSON.parse(adminGuardado))
+    }
+  }, [])
+
+  const handleLogout = () => {
+    localStorage.removeItem("admin")
+    localStorage.removeItem("token")
+    setAdmin(null)
+  }
+
+  // Si no hay admin, mostrar login
+  if (!admin) {
+    return <Login onLoginSuccess={setAdmin} apiUrl={API_BASE_URL} />
+  }
 
   // ========================================================
   // 🔵 1. WebSocket con reconexión + getIncidents
@@ -178,14 +204,24 @@ function App() {
     <div className="min-h-screen bg-white p-8">
       <div className="max-w-5xl mx-auto">
         {/* HEADER */}
-        <div className="mb-12">
-          <h1 className="text-5xl font-black text-black mb-3">
-            Panel de Administración — UTEC
-          </h1>
-          <p className="text-gray-600 text-lg">
-            Administración de reportes del tenant{" "}
-            <span className="font-semibold">utec</span> en tiempo real
-          </p>
+        <div className="mb-12 flex justify-between items-start">
+          <div>
+            <h1 className="text-5xl font-black text-black mb-3">
+              Panel de Administración — UTEC
+            </h1>
+            <p className="text-gray-600 text-lg">
+              Hola, <b>{admin?.nombre}</b> • Administración de reportes del tenant{" "}
+              <span className="font-semibold">utec</span> en tiempo real
+            </p>
+          </div>
+          
+          {/* Logout Button */}
+          <button
+            onClick={handleLogout}
+            className="text-sm text-red-600 hover:text-red-800 font-semibold px-4 py-2 whitespace-nowrap"
+          >
+            Cerrar Sesión
+          </button>
         </div>
 
         {/* ERROR */}
