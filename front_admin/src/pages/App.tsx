@@ -82,7 +82,7 @@ function App() {
 
         // 👉 Lista completa de incidentes
         if (msg.type === "incidentsList") {
-          console.log("� Lista de incidentes recibida")
+          console.log("📋 Lista de incidentes recibida")
           setReportes(msg.incidents ?? [])
         }
 
@@ -169,7 +169,7 @@ function App() {
     setAdmin(null)
   }
 
-  console.log("� Estado actual de admin:", admin)
+  console.log("🔍 Estado actual de admin:", admin)
 
   // Si no hay admin, mostrar login
   if (!admin) {
@@ -179,34 +179,6 @@ function App() {
 
   console.log("✅ Admin existe, mostrando dashboard")
 
-  // ========================================================
-  // � Filtro local
-  // ========================================================
-
-    ws.current.onclose = () => {
-      console.warn("❌ WS Desconectado, reconectando en 5s…")
-
-      // Reconexión automática
-      reconnectTimeout.current = setTimeout(connectWS, 5000)
-    }
-
-    ws.current.onerror = (err) => {
-      console.error("WS Error:", err)
-      ws.current?.close()
-    }
-  }
-
-  useEffect(() => {
-    connectWS()
-    return () => {
-      clearTimeout(reconnectTimeout.current)
-      ws.current?.close()
-    }
-  }, [])
-
-  // ========================================================
-  // 🔵 2. REST: cargar incidentes una sola vez
-  // ========================================================
   // ========================================================
   // 🔵 Filtro local
   // ========================================================
@@ -220,27 +192,34 @@ function App() {
   })
 
   // ========================================================
-  // 🔵 4. Eliminar
+  // 🔵 Eliminar
   // ========================================================
-  const handleElimin.ar = async (uuid: string) => {
+  const handleEliminar = async (uuid: string) => {
     if (!confirm("¿Seguro de eliminar este reporte?")) return
 
     try {
       const url = `${API_BASE_URL}/reporte/${uuid}?tenant_id=${TENANT_ID}`
+      console.log("🗑️ Eliminando reporte:", uuid)
+      
       const resp = await fetch(url, { method: "DELETE" })
+      console.log("📡 Status:", resp.status)
 
       let data = await resp.json()
       if (typeof data.body === "string") {
         data = JSON.parse(data.body)
       }
 
+      // ✅ PRIMERO verificar si el backend respondió bien
       if (!resp.ok) {
         throw new Error(data.error || data.mensaje)
       }
 
+      // ✅ DESPUÉS eliminar del estado local
       setReportes((prev) => prev.filter((r) => r.uuid !== uuid))
       setError("")
+      console.log("✅ Reporte eliminado del backend y del estado")
     } catch (err) {
+      console.error("❌ Error al eliminar:", err)
       setError(err instanceof Error ? err.message : "Error eliminando reporte")
     }
   }
