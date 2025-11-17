@@ -25,20 +25,27 @@ export default function Login({ onLoginSuccess, apiUrl }: LoginProps) {
       })
 
       let data = await resp.json()
+      console.log("🔍 Respuesta original:", data)
 
       // Si el body viene como string, parsearlo
       if (typeof data.body === "string") {
         data = JSON.parse(data.body)
+        console.log("🔍 Después de parsear body:", data)
       }
 
       if (!resp.ok) {
         throw new Error(data.error || "Error al iniciar sesión")
       }
 
+      console.log("✅ Data final:", data)
+      console.log("✅ Admin:", data.admin)
+      console.log("✅ Token:", data.token)
+
       // Guardar en localStorage
       localStorage.setItem("admin", JSON.stringify(data.admin))
       localStorage.setItem("token", data.token)
 
+      // Actualizar estado inmediatamente - esto debería disparar el re-render
       onLoginSuccess(data.admin)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error desconocido")

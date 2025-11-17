@@ -45,26 +45,21 @@ function App() {
   // Verificar si hay sesión activa
   useEffect(() => {
     const usuarioGuardado = localStorage.getItem("usuario")
+    console.log("🔍 Verificando localStorage:", usuarioGuardado)
     if (usuarioGuardado) {
-      setUsuario(JSON.parse(usuarioGuardado))
+      const parsedUsuario = JSON.parse(usuarioGuardado)
+      console.log("✅ Usuario encontrado:", parsedUsuario)
+      setUsuario(parsedUsuario)
     }
   }, [])
-
-  const handleLogout = () => {
-    localStorage.removeItem("usuario")
-    localStorage.removeItem("token")
-    setUsuario(null)
-  }
-
-  // Si no hay usuario, mostrar login
-  if (!usuario) {
-    return <Login onLoginSuccess={setUsuario} apiUrl={API_BASE_URL} />
-  }
 
   // ==============================
   // WEBSOCKET CONNECTION
   // ==============================
   useEffect(() => {
+    // Solo conectar si hay usuario
+    if (!usuario) return
+
     const connectWebSocket = () => {
       console.log("Conectando a WebSocket:", WS_URL)
       const ws = new WebSocket(WS_URL)
@@ -110,10 +105,8 @@ function App() {
       }
 
       ws.onclose = () => {
-        console.log("WebSocket desconectado, intentando reconectar en 5s...")
+        console.log("WebSocket desconectado")
         setIsConnected(false)
-        // Intentar reconectar después de 5 segundos
-        setTimeout(connectWebSocket, 5000)
       }
 
       wsRef.current = ws
@@ -121,13 +114,34 @@ function App() {
 
     connectWebSocket()
 
-    // Cleanup al desmontar el componente
+    // Cleanup al desmontar
     return () => {
       if (wsRef.current) {
         wsRef.current.close()
       }
     }
-  }, [])
+  }, [usuario]) // Dependencia: usuario
+
+  const handleLoginSuccess = (usuarioData: Usuario) => {
+    console.log("🎯 handleLoginSuccess llamado con:", usuarioData)
+    setUsuario(usuarioData)
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem("usuario")
+    localStorage.removeItem("token")
+    setUsuario(null)
+  }
+
+  console.log("🔍 Estado actual de usuario:", usuario)
+
+  // Si no hay usuario, mostrar login
+  if (!usuario) {
+    console.log("❌ No hay usuario, mostrando Login")
+    return <Login onLoginSuccess={handleLoginSuccess} apiUrl={API_BASE_URL} />
+  }
+
+  console.log("✅ Usuario existe, mostrando app")
 
   // Función para enviar mensajes por WebSocket
   const sendWebSocketMessage = (message: any) => {

@@ -41,10 +41,127 @@ function App() {
   // Verificar si hay sesión activa
   useEffect(() => {
     const adminGuardado = localStorage.getItem("admin")
+    console.log("🔍 Verificando localStorage:", adminGuardado)
     if (adminGuardado) {
-      setAdmin(JSON.parse(adminGuardado))
+      const parsedAdmin = JSON.parse(adminGuardado)
+      console.log("✅ Admin encontrado:", parsedAdmin)
+      setAdmin(parsedAdmin)
     }
   }, [])
+
+  // ========================================================
+  // 🔵 WebSocket con reconexión + getIncidents
+  // ========================================================
+  useEffect(() => {
+    // Solo conectar si hay admin
+    if (!admin) return
+
+    const connectWS = () => {
+      console.log("Conectando WebSocket ADMIN...")
+
+      ws.current = new WebSocket(WS_URL)
+
+      ws.current.onopen = () => {
+        console.log("WS Conectado ✔️")
+
+        // 👉 Pedir lista completa de incidentes
+        ws.current?.send(JSON.stringify({ action: "getIncidents" }))
+
+        // 👉 Registrar admin
+        ws.current?.send(
+          JSON.stringify({
+            action: "register",
+            username: "admin"
+          })
+        )
+      }
+
+      ws.current.onmessage = (event) => {
+        const msg = JSON.parse(event.data)
+        console.log("📩 WS message:", msg)
+
+        // 👉 Lista completa de incidentes
+        if (msg.type === "incidentsList") {
+          console.log("� Lista de incidentes recibida")
+          setReportes(msg.incidents ?? [])
+        }
+
+        // 👉 Nuevo reporte en tiempo real
+        if (msg.type === "nuevoReporte") {
+          setReportes((prev) => [...prev, msg.data])
+        }
+
+        // 👉 newIncident también llega en algunos flujos
+        if (msg.type === "newIncident") {
+          setReportes((prev) => [...prev, msg.incident])
+        }
+
+        // 👉 Error WS
+        if (msg.type === "error") {
+          console.error("❌ Error WS:", msg.message)
+        }
+      }
+
+      ws.current.onclose = () => {
+        console.warn("❌ WS Desconectado, reconectando en 5s…")
+
+        // Reconexión automática
+        reconnectTimeout.current = setTimeout(connectWS, 5000)
+      }
+
+      ws.current.onerror = (err) => {
+        console.error("WS Error:", err)
+        ws.current?.close()
+      }
+    }
+
+    connectWS()
+
+    return () => {
+      clearTimeout(reconnectTimeout.current)
+      ws.current?.close()
+    }
+  }, [admin]) // Dependencia: admin
+
+  // ========================================================
+  // 🔵 REST: cargar incidentes una sola vez
+  // ========================================================
+  useEffect(() => {
+    // Solo cargar si hay admin
+    if (!admin) return
+
+    const fetchReportes = async () => {
+      setLoading(true)
+      setError("")
+
+      try {
+        const url = `${API_BASE_URL}/reporte/listar?tenant_id=${TENANT_ID}`
+        const resp = await fetch(url)
+
+        if (!resp.ok) {
+          throw new Error(`HTTP Error ${resp.status}`)
+        }
+
+        let data = await resp.json()
+        if (typeof data.body === "string") {
+          data = JSON.parse(data.body)
+        }
+
+        setReportes(data.items || [])
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Error al cargar reportes")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchReportes()
+  }, [admin]) // Dependencia: admin
+
+  const handleLoginSuccess = (adminData: Admin) => {
+    console.log("🎯 handleLoginSuccess llamado con:", adminData)
+    setAdmin(adminData)
+  }
 
   const handleLogout = () => {
     localStorage.removeItem("admin")
@@ -52,59 +169,19 @@ function App() {
     setAdmin(null)
   }
 
+  console.log("� Estado actual de admin:", admin)
+
   // Si no hay admin, mostrar login
   if (!admin) {
-    return <Login onLoginSuccess={setAdmin} apiUrl={API_BASE_URL} />
+    console.log("❌ No hay admin, mostrando Login")
+    return <Login onLoginSuccess={handleLoginSuccess} apiUrl={API_BASE_URL} />
   }
 
+  console.log("✅ Admin existe, mostrando dashboard")
+
   // ========================================================
-  // 🔵 1. WebSocket con reconexión + getIncidents
+  // � Filtro local
   // ========================================================
-  const connectWS = () => {
-    console.log("Conectando WebSocket ADMIN...")
-
-    ws.current = new WebSocket(WS_URL)
-
-    ws.current.onopen = () => {
-      console.log("WS Conectado ✔️")
-
-      // 👉 Pedir lista completa de incidentes
-      ws.current?.send(JSON.stringify({ action: "getIncidents" }))
-
-      // 👉 Registrar admin (lo mantengo igual que tu código)
-      ws.current?.send(
-        JSON.stringify({
-          action: "register",
-          username: "admin"
-        })
-      )
-    }
-
-    ws.current.onmessage = (event) => {
-      const msg = JSON.parse(event.data)
-      console.log("📩 WS message:", msg)
-
-      // 👉 Lista completa de incidentes
-      if (msg.type === "incidentsList") {
-        console.log("📋 Lista de incidentes recibida")
-        setReportes(msg.incidents ?? [])
-      }
-
-      // 👉 Nuevo reporte en tiempo real
-      if (msg.type === "nuevoReporte") {
-        setReportes((prev) => [...prev, msg.data])
-      }
-
-      // 👉 newIncident también llega en algunos flujos
-      if (msg.type === "newIncident") {
-        setReportes((prev) => [...prev, msg.incident])
-      }
-
-      // 👉 Error WS
-      if (msg.type === "error") {
-        console.error("❌ Error WS:", msg.message)
-      }
-    }
 
     ws.current.onclose = () => {
       console.warn("❌ WS Desconectado, reconectando en 5s…")
@@ -130,37 +207,8 @@ function App() {
   // ========================================================
   // 🔵 2. REST: cargar incidentes una sola vez
   // ========================================================
-  const fetchReportes = async () => {
-    setLoading(true)
-    setError("")
-
-    try {
-      const url = `${API_BASE_URL}/reporte/listar?tenant_id=${TENANT_ID}`
-      const resp = await fetch(url)
-
-      if (!resp.ok) {
-        throw new Error(`HTTP Error ${resp.status}`)
-      }
-
-      let data = await resp.json()
-      if (typeof data.body === "string") {
-        data = JSON.parse(data.body)
-      }
-
-      setReportes(data.items || [])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al cargar reportes")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchReportes()
-  }, [])
-
   // ========================================================
-  // 🔵 3. Filtro local
+  // 🔵 Filtro local
   // ========================================================
   const reportesFiltrados = reportes.filter((r) => {
     if (!searchTerm.trim()) return true
@@ -174,7 +222,7 @@ function App() {
   // ========================================================
   // 🔵 4. Eliminar
   // ========================================================
-  const handleEliminar = async (uuid: string) => {
+  const handleElimin.ar = async (uuid: string) => {
     if (!confirm("¿Seguro de eliminar este reporte?")) return
 
     try {
